@@ -62,6 +62,8 @@ import {
   icsExport,
 } from "./model";
 import type { Ledger, Item, Category, Cadence } from "./model";
+import { readCloud, writeCloud, type CloudSnapshot } from "./cloud";
+import { CloudGate, GithubSyncSettings } from "./CloudGate";
 import "./style.css";
 
 const ICONS: Record<string, Icon> = {
@@ -84,7 +86,7 @@ type ConfirmAction = {
   body: string;
   label: string;
   danger?: boolean;
-  run: () => void;
+  run: () => unknown;
 };
 const formatDate = (date: string) => date.replaceAll("-", ".");
 function download(
@@ -114,8 +116,29 @@ function loadInitial(): { ledger: Ledger; error: string } {
     };
   }
 }
-function App() {
-  const [initial] = useState(loadInitial);
+function App({
+  cloud,
+  token,
+  onConnect,
+  onDisconnect,
+}: {
+  cloud?: CloudSnapshot;
+  token: string;
+  onConnect: (token: string, remember: boolean) => Promise<void>;
+  onDisconnect: () => void;
+}) {
+  const [initial] = useState(() =>
+    cloud ? { ledger: cloud.ledger, error: "" } : loadInitial(),
+  );
+  const revision = useRef(cloud?.revision ?? "");
+  const operation = useRef(0);
+  const saving = useRef(false);
+  const [busy, setBusy] = useState(false);
+  const [cloudError, setCloudError] = useState("");
+  const [failedSave, setFailedSave] = useState<Ledger | null>(null);
+  const [localBackup, setLocalBackup] = useState(() =>
+    cloud ? loadInitial() : null,
+  );
   const [ledger, setLedger] = useState(initial.ledger);
   const [storageError, setStorageError] = useState(initial.error);
   const [view, setView] = useState("overview");
@@ -140,6 +163,7 @@ function App() {
     }
   }, [toast]);
   useEffect(() => {
+    if (cloud) return;
     const listen = (e: StorageEvent) => {
       if (e.key === STORAGE_KEY) {
         try {
@@ -158,7 +182,81 @@ function App() {
     window.addEventListener("storage", listen);
     return () => window.removeEventListener("storage", listen);
   }, []);
-  const commit = (next: Ledger, message?: string, allowRecovery = false) => {
+  const editing = Boolean(editor || categoryEditor || confirm || failedSave);
+  const editingRef = useRef(editing);
+  editingRef.current = editing;
+  const refreshCloud = async (explicit = false) => {
+    if (!cloud || saving.current || (!explicit && editingRef.current)) return;
+    const currentOperation = ++operation.current;
+    try {
+      const latest = await readCloud(token);
+      if (
+        currentOperation !== operation.current ||
+        saving.current ||
+        (!explicit && editingRef.current)
+      )
+        return;
+      revision.current = latest.revision;
+      setLedger(latest.ledger);
+      setCloudError("");
+      if (explicit) {
+        setEditor(null);
+        setCategoryEditor(null);
+        setConfirm(null);
+        setFailedSave(null);
+        setToast("已读取最新云端账本");
+      }
+    } catch (e) {
+      if (currentOperation === operation.current)
+        setCloudError(e instanceof Error ? e.message : "云端连接失败");
+    }
+  };
+  useEffect(() => {
+    if (!cloud) return;
+    const refresh = () => {
+      if (document.visibilityState === "visible") void refreshCloud();
+    };
+    const timer = setInterval(refresh, 60_000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    window.addEventListener("online", refresh);
+    return () => {
+      clearInterval(timer);
+      ++operation.current;
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+      window.removeEventListener("online", refresh);
+    };
+  }, []);
+  const commit = async (
+    next: Ledger,
+    message?: string,
+    allowRecovery = false,
+  ) => {
+    if (cloud) {
+      if (saving.current) return false;
+      saving.current = true;
+      setBusy(true);
+      ++operation.current;
+      try {
+        const saved = await writeCloud(next, revision.current, token);
+        revision.current = saved.revision;
+        setLedger(saved.ledger);
+        setCloudError("");
+        setFailedSave(null);
+        if (message) setToast(message);
+        return true;
+      } catch (e) {
+        setFailedSave(next);
+        setCloudError(
+          e instanceof Error ? e.message : "云端保存失败，本次修改尚未保存。",
+        );
+        return false;
+      } finally {
+        saving.current = false;
+        setBusy(false);
+      }
+    }
     if (storageError && !allowRecovery) {
       setToast("请先导出原始数据，再通过导入备份或清空账本恢复");
       return false;
@@ -253,9 +351,9 @@ function App() {
       body: "该项目和它的付款记录将一并移除。删除前可以在设置中导出完整备份。",
       label: "删除项目",
       danger: true,
-      run: () => {
+      run: async () => {
         if (
-          commit(
+          await commit(
             { ...ledger, items: ledger.items.filter((i) => i.id !== item.id) },
             "项目已删除",
           )
@@ -304,9 +402,8 @@ function App() {
       title: "开始自己的账本",
       body: "这会清空当前示例账本。接下来可以添加你的第一个项目。",
       label: "清空示例，开始记录",
-      run: () => {
-        commit(emptyLedger(), "新账本已准备好");
-        setDetail(null);
+      run: async () => {
+        if (await commit(emptyLedger(), "新账本已准备好")) setDetail(null);
       },
     });
   const importBackup = async (file?: File) => {
@@ -319,8 +416,8 @@ function App() {
         title: "导入这份账本备份？",
         body: `包含 ${next.items.length} 个项目、${next.categories.length} 个分类。导入会替换当前账本，建议先导出当前备份。`,
         label: "替换并导入",
-        run: () => {
-          if (commit(next, "备份已成功导入", true)) {
+        run: async () => {
+          if (await commit(next, "备份已成功导入", true)) {
             setDetail(null);
             setCategoryFilter("all");
           }
@@ -340,7 +437,7 @@ function App() {
   });
 
   return (
-    <div className="app-shell">
+    <div className="app-shell" inert={busy} aria-busy={busy}>
       <aside className="sidebar">
         <a
           className="brand"
@@ -430,7 +527,13 @@ function App() {
           </button>
           <div className="local-status">
             <span />
-            本地账本 · 自动保存
+            {cloud
+              ? busy
+                ? "正在保存到云端…"
+                : cloudError
+                  ? "云端需要检查"
+                  : "私人云端账本"
+              : "本地账本 · 自动保存"}
           </div>
         </div>
       </aside>
@@ -453,6 +556,61 @@ function App() {
           </div>
         </header>
         <div className="page-content">
+          {cloud && (
+            <div className="cloud-banner" role="status">
+              <span>
+                <ShieldCheck size={18} />
+                {busy ? "正在保存到云端…" : "云端账本 · 所有设备共用一份数据"}
+              </span>
+              <button
+                disabled={busy}
+                onClick={() => {
+                  if (editing) {
+                    setToast(
+                      "请先完成或关闭编辑；未保存的修改可下载副本后通过错误提示重新读取。",
+                    );
+                    return;
+                  }
+                  void refreshCloud(true);
+                }}
+              >
+                读取最新账本
+              </button>
+            </div>
+          )}
+          {cloudError && (
+            <div className="error-banner cloud-error" role="alert">
+              <WarningCircle size={20} />
+              <span>{cloudError}</span>
+              {failedSave && (
+                <button
+                  onClick={() =>
+                    download(
+                      JSON.stringify(failedSave, null, 2),
+                      `日有数-未保存副本-${now}.json`,
+                    )
+                  }
+                >
+                  下载未保存副本
+                </button>
+              )}
+              <button
+                disabled={busy}
+                onClick={() =>
+                  failedSave
+                    ? setConfirm({
+                        title: "读取最新云端账本？",
+                        body: "这会关闭编辑表单并放弃本页尚未保存的修改。请先下载未保存副本，需要时可对照重新录入。",
+                        label: "读取并放弃本页修改",
+                        run: () => refreshCloud(true),
+                      })
+                    : void refreshCloud(true)
+                }
+              >
+                重新读取
+              </button>
+            </div>
+          )}
           {ledger.demo && (
             <div className="demo-banner">
               <span>
@@ -1026,6 +1184,90 @@ function App() {
 
           {view === "settings" && (
             <div className="settings-stack">
+              <GithubSyncSettings
+                connected={Boolean(cloud)}
+                onConnect={onConnect}
+                onDisconnect={() => {
+                  if (failedSave || editor || categoryEditor || confirm) {
+                    setToast("请先保留未保存副本并关闭编辑，再断开同步");
+                    return;
+                  }
+                  onDisconnect();
+                }}
+              />
+              {cloud && (
+                <section className="panel settings-panel">
+                  <div className="settings-heading">
+                    <span className="soft-icon">
+                      <ShieldCheck size={23} />
+                    </span>
+                    <div>
+                      <h2>我的云端账本</h2>
+                      <p>GitHub 私有仓库 · 手机与电脑共用同一份记录</p>
+                    </div>
+                  </div>
+                  {localBackup &&
+                    (localBackup.error ||
+                      localBackup.ledger.items.length > 0 ||
+                      JSON.stringify(localBackup.ledger.categories) !==
+                        JSON.stringify(emptyLedger().categories)) && (
+                      <div className="setting-row">
+                        <div>
+                          <h3>迁移此浏览器的旧账本</h3>
+                          <p>
+                            原浏览器记录保留不变。迁移会替换云端账本，请先导出云端备份。
+                          </p>
+                        </div>
+                        <button
+                          className="btn btn-secondary"
+                          disabled={busy || Boolean(localBackup.error)}
+                          onClick={() =>
+                            setConfirm({
+                              title: "将旧账本迁移到云端？",
+                              body: `本浏览器有 ${localBackup.ledger.items.length} 个项目。这会替换云端的 ${ledger.items.length} 个项目，不会合并；原浏览器记录保留。`,
+                              label: "确认迁移到云端",
+                              run: async () => {
+                                if (
+                                  await commit(
+                                    localBackup.ledger,
+                                    "旧账本已迁移到云端",
+                                  )
+                                )
+                                  setLocalBackup(null);
+                              },
+                            })
+                          }
+                        >
+                          迁移到云端
+                        </button>
+                      </div>
+                    )}
+                  {localBackup?.error && (
+                    <div className="setting-row">
+                      <div>
+                        <h3>旧账本需要恢复</h3>
+                        <p role="alert">{localBackup.error}</p>
+                      </div>
+                      <button
+                        className="btn btn-secondary"
+                        onClick={() => {
+                          try {
+                            download(
+                              localStorage.getItem(STORAGE_KEY) || "{}",
+                              `日有数-旧账本原始数据-${now}.json`,
+                            );
+                          } catch {
+                            setToast("浏览器禁止访问旧账本，请检查网站权限");
+                          }
+                        }}
+                      >
+                        导出旧账本原始数据
+                      </button>
+                    </div>
+                  )}
+                </section>
+              )}
+
               <section className="panel settings-panel">
                 <div className="settings-heading">
                   <span className="soft-icon">
@@ -1040,7 +1282,15 @@ function App() {
                   </div>
                   <span className="saved-badge">
                     <CheckCircle size={15} />
-                    {storageError ? "需要恢复" : "已保存在此浏览器"}
+                    {cloud
+                      ? busy
+                        ? "正在保存到云端"
+                        : cloudError
+                          ? "需要检查云端"
+                          : "已保存在云端"
+                      : storageError
+                        ? "需要恢复"
+                        : "已保存在此浏览器"}
                   </span>
                 </div>
                 <div className="setting-row">
@@ -1057,7 +1307,9 @@ function App() {
                   <div>
                     <h3>导入备份</h3>
                     <p>
-                      在另一台设备或浏览器中继续记录。导入前会请你确认替换。
+                      {cloud
+                        ? "导入会替换所有设备共用的云端账本，导入前会请你确认。"
+                        : "在另一台设备或浏览器中继续记录。导入前会请你确认替换。"}
                     </p>
                   </div>
                   <button
@@ -1094,7 +1346,9 @@ function App() {
                 <div className="storage-note">
                   <Info size={18} />
                   <p>
-                    账本只保存在当前浏览器，不会自动同步到其他设备。清除网站数据或使用无痕模式可能丢失记录，请定期导出备份。网站代码公开，个人账本不会随代码上传。
+                    {cloud
+                      ? "账本保存到 GitHub 私有仓库，所有已连接设备共用同一份数据。页面每 60 秒及重新回到前台时读取最新记录；离线时不能保存。多设备修改发生冲突时会阻止覆盖并提示重试。建议定期导出备份。"
+                      : "账本只保存在当前浏览器，不会自动同步到其他设备。清除网站数据或使用无痕模式可能丢失记录，请定期导出备份。网站代码公开，个人账本不会随代码上传。"}
                   </p>
                 </div>
               </section>
@@ -1194,7 +1448,8 @@ function App() {
               日有数<span>·</span>让每一份拥有，都值得。
             </span>
             <span>
-              <CheckCircle size={13} /> 本地记录，随时备份
+              <CheckCircle size={13} />{" "}
+              {cloud ? "云端记录，多设备共用" : "本地记录，随时备份"}
             </span>
           </footer>
         </div>
@@ -1233,7 +1488,7 @@ function App() {
           categories={ledger.categories}
           isNew={!ledger.items.some((i) => i.id === editor.id)}
           onClose={() => setEditor(null)}
-          onSave={(item) => {
+          onSave={async (item) => {
             const exists = ledger.items.some((i) => i.id === item.id);
             const next = exists
               ? ledger.items.map((i) => (i.id === item.id ? item : i))
@@ -1252,7 +1507,7 @@ function App() {
                   },
                 ];
             if (
-              commit(
+              await commit(
                 { ...ledger, items: next },
                 exists ? "项目已更新" : "新的花费，已认真记下",
               )
@@ -1418,10 +1673,10 @@ function App() {
           category={categoryEditor}
           categories={ledger.categories}
           onClose={() => setCategoryEditor(null)}
-          onSave={(category) => {
+          onSave={async (category) => {
             const exists = ledger.categories.some((c) => c.id === category.id);
             if (
-              commit(
+              await commit(
                 {
                   ...ledger,
                   categories: exists
@@ -1452,9 +1707,10 @@ function App() {
             </button>
             <button
               className={`btn ${confirm.danger ? "btn-danger" : "btn-primary"}`}
-              onClick={() => {
-                confirm.run();
-                setConfirm(null);
+              disabled={busy}
+              onClick={async () => {
+                const result = await confirm.run();
+                if (result !== false) setConfirm(null);
               }}
             >
               {confirm.label}
@@ -2250,6 +2506,16 @@ function CalendarView({
 
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <App />
+    <CloudGate>
+      {(cloud, token, connect, disconnect) => (
+        <App
+          key={token ? "cloud" : "local"}
+          cloud={cloud}
+          token={token}
+          onConnect={connect}
+          onDisconnect={disconnect}
+        />
+      )}
+    </CloudGate>
   </React.StrictMode>,
 );

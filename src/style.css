@@ -3147,3 +3147,67 @@ footer > span:last-child {
     display: none;
   }
 }
+
+.cloud-gate {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+.cloud-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 14px 18px;
+  background: #edf4ee;
+  border-radius: 12px;
+  margin-bottom: 20px;
+  color: var(--green);
+  font-size: 12px;
+}
+.cloud-banner span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cloud-banner button,
+.cloud-error button {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.cloud-error {
+  flex-wrap: wrap;
+}
+.cloud-connect {
+  width: min(100%, 680px);
+}
+.cloud-connect > h1 {
+  margin-bottom: 22px;
+}
+.cloud-connect > .btn {
+  margin-bottom: 20px;
+}
+.github-settings form > p {
+  line-height: 1.9;
+  margin-bottom: 16px;
+  overflow-wrap: anywhere;
+}
+.github-settings form > .text-button {
+  display: inline-flex;
+  margin-bottom: 20px;
+  text-decoration: underline;
+}
+.github-settings p a {
+  text-decoration: underline;
+}
+.remember-token {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 18px 0;
+}
+.github-settings .settings-heading p {
+  overflow-wrap: anywhere;
+}
