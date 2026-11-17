@@ -1,0 +1,26 @@
+{
+  "id": "./",
+  "name": "日有所值 · Daily Cost",
+  "short_name": "日有所值",
+  "description": "订阅、资产与每日成本，轻松记，心中有数。",
+  "lang": "zh-CN",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f7f8f5",
+  "theme_color": "#f5f3fa",
+  "icons": [
+    {
+      "src": "./icons/riyousuozhi-192-v1.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/riyousuozhi-512-v1.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

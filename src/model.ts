@@ -245,7 +245,7 @@ export function validateItem(
 }
 export function parseLedger(input: unknown): Ledger {
   if (!input || typeof input !== "object")
-    throw new Error("这不是有效的日有数备份文件");
+    throw new Error("这不是有效的日有所值备份文件");
   const v = input as Ledger;
   if (
     v.version !== 1 ||
@@ -444,7 +444,7 @@ export function icsExport(items: Item[]): string {
         `DTSTART;VALUE=DATE:${event.date.replaceAll("-", "")}`,
         `DTEND;VALUE=DATE:${addDays(event.date, 1).replaceAll("-", "")}`,
         `SUMMARY:${escape(item.name)} 续费 ¥${item.amount}`,
-        `DESCRIPTION:${escape(`${CADENCES[item.cadence]} · ${item.channel}\n来自日有数；请核对实际账单。`)}`,
+        `DESCRIPTION:${escape(`${CADENCES[item.cadence]} · ${item.channel}\n来自日有所值；请核对实际账单。`)}`,
         "BEGIN:VALARM",
         "TRIGGER:-P3D",
         "ACTION:DISPLAY",

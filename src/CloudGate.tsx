@@ -179,7 +179,7 @@ export function CloudGate({
     return (
       <main className="cloud-gate">
         <div className="cloud-connect">
-          <h1>日有数 · 我的云端账本</h1>
+          <h1>日有所值 · 我的云端账本</h1>
           {loading ? (
             <p role="status">正在从 GitHub 读取你的账本…</p>
           ) : (

@@ -65,6 +65,8 @@ import type { Ledger, Item, Category, Cadence } from "./model";
 import { readCloud, writeCloud, type CloudSnapshot } from "./cloud";
 import { CloudGate, GithubSyncSettings } from "./CloudGate";
 import "./style.css";
+import "./playful.css";
+import { Daisy } from "./Daisy";
 
 const ICONS: Record<string, Icon> = {
   software: SquaresFour,
@@ -89,6 +91,19 @@ type ConfirmAction = {
   run: () => unknown;
 };
 const formatDate = (date: string) => date.replaceAll("-", ".");
+// Present the original muted category palette in the new theme without changing saved data.
+const THEME_CATEGORY_INKS: Record<string, string> = {
+  "#49765e": "#ac86d1",
+  "#709e95": "#83baa1",
+  "#b49b73": "#d6aa61",
+  "#8493ad": "#90a7ce",
+  "#b38383": "#d08e9e",
+  "#9d95a9": "#bc99ce",
+  "#6a8b9b": "#82b2c2",
+  "#90987a": "#b6bc79",
+};
+const categoryInk = (color: string) =>
+  THEME_CATEGORY_INKS[color.toLowerCase()] || color;
 function download(
   content: string,
   filename: string,
@@ -335,7 +350,7 @@ function App({
     setStatusFilter("all");
   };
   const exportBackup = () => {
-    download(JSON.stringify(ledger, null, 2), `日有数-备份-${now}.json`);
+    download(JSON.stringify(ledger, null, 2), `日有所值-备份-${now}.json`);
     setToast("备份已导出");
   };
   const newItem = () => {
@@ -446,13 +461,13 @@ function App({
             e.preventDefault();
             changeView("overview");
           }}
-          aria-label="日有数首页"
+          aria-label="日有所值首页"
         >
           <span className="brand-mark">
-            <ChartBar size={25} weight="fill" />
+            <img className="brand-logo" src="./icons/riyousuozhi-192-v1.png" alt="" />
           </span>
           <span>
-            日有数<small>DAILY COST</small>
+            日有所值<small>DAILY COST</small>
           </span>
         </a>
         <div className="nav-caption">我的账本</div>
@@ -501,7 +516,10 @@ function App({
                 setKindFilter("all");
               }}
             >
-              <span className="category-dot" style={{ background: c.color }} />
+              <span
+                className="category-dot"
+                style={{ background: categoryInk(c.color) }}
+              />
               <span>{c.name}</span>
               <span>
                 {ledger.items.filter((i) => i.categoryId === c.id).length}
@@ -511,7 +529,7 @@ function App({
         </div>
         <div className="sidebar-bottom">
           <div className="quiet-note">
-            <Plant size={26} weight="duotone" />
+            <Daisy tone="lilac" />
             <p>
               让花费看得见
               <br />
@@ -587,7 +605,7 @@ function App({
                   onClick={() =>
                     download(
                       JSON.stringify(failedSave, null, 2),
-                      `日有数-未保存副本-${now}.json`,
+                      `日有所值-未保存副本-${now}.json`,
                     )
                   }
                 >
@@ -718,18 +736,16 @@ function App({
                     <ChartBar size={19} />
                   </div>
                   <div className="hero-decoration" aria-hidden="true">
-                    <i />
-                    <i />
-                    <i />
-                    <i />
-                    <i />
+                    <span className="hero-sparkle sparkle-one">✦</span>
+                    <Daisy tone="lilac" />
+                    <span className="hero-sparkle sparkle-two">✧</span>
                   </div>
                 </section>
                 <section className="metric-card">
                   <div className="metric-title">
                     本月均摊成本
                     <span className="soft-icon">
-                      <Wallet size={19} />
+                      <Wallet size={24} weight="duotone" />
                     </span>
                   </div>
                   <div className="metric-value">
@@ -754,7 +770,7 @@ function App({
                   <div className="metric-title">
                     未来 30 天待付
                     <span className="soft-icon">
-                      <CalendarBlank size={19} />
+                      <CalendarBlank size={24} weight="duotone" />
                     </span>
                   </div>
                   <div className="metric-value">
@@ -859,7 +875,7 @@ function App({
                           >
                             <span
                               className="category-dot"
-                              style={{ background: c.color }}
+                              style={{ background: categoryInk(c.color) }}
                             />
                             <span>{c.name}</span>
                             <b>
@@ -1052,7 +1068,7 @@ function App({
                   onClick={() => {
                     download(
                       icsExport(ledger.items),
-                      `日有数-付费提醒-${now}.ics`,
+                      `日有所值-付费提醒-${now}.ics`,
                       "text/calendar;charset=utf-8",
                     );
                     setToast("已导出未来一年的日历提醒，提前 3 天提醒");
@@ -1114,7 +1130,10 @@ function App({
                     <div className="category-manage-top">
                       <span
                         className="item-icon"
-                        style={{ background: `${c.color}15`, color: c.color }}
+                        style={{
+                          background: `${categoryInk(c.color)}15`,
+                          color: categoryInk(c.color),
+                        }}
                       >
                         <IconComponent size={25} />
                       </span>
@@ -1254,7 +1273,7 @@ function App({
                           try {
                             download(
                               localStorage.getItem(STORAGE_KEY) || "{}",
-                              `日有数-旧账本原始数据-${now}.json`,
+                              `日有所值-旧账本原始数据-${now}.json`,
                             );
                           } catch {
                             setToast("浏览器禁止访问旧账本，请检查网站权限");
@@ -1332,7 +1351,7 @@ function App({
                         try {
                           download(
                             localStorage.getItem(STORAGE_KEY) || "{}",
-                            `日有数-原始数据-${now}.json`,
+                            `日有所值-原始数据-${now}.json`,
                           );
                         } catch {
                           setToast("当前浏览器禁止访问存储，请检查网站权限");
@@ -1394,7 +1413,7 @@ function App({
                   </span>
                   <div>
                     <h2>
-                      日有数 <span className="version">v1.0</span>
+                      日有所值 <span className="version">v1.0</span>
                     </h2>
                     <p>轻一点的账本，清楚一点的生活。</p>
                   </div>
@@ -1445,7 +1464,7 @@ function App({
           )}
           <footer>
             <span className="footer-brand">
-              日有数<span>·</span>让每一份拥有，都值得。
+              日有所值<span>·</span>让每一份拥有，都值得。
             </span>
             <span>
               <CheckCircle size={13} />{" "}
@@ -1736,7 +1755,10 @@ function ItemIcon({ item, category }: { item: Item; category: Category }) {
   return (
     <span
       className="item-icon"
-      style={{ background: `${category.color}15`, color: category.color }}
+      style={{
+        background: `${categoryInk(category.color)}15`,
+        color: categoryInk(category.color),
+      }}
     >
       <IconComponent size={25} weight="duotone" />
     </span>
@@ -1808,7 +1830,12 @@ function ProjectCard({
           <span>{item.channel}</span>
         </div>
         <div className="progress-track">
-          <span style={{ width: `${progress}%`, background: category.color }} />
+          <span
+            style={{
+              width: `${progress}%`,
+              background: categoryInk(category.color),
+            }}
+          />
         </div>
         <div className="project-bottom">
           <span>
@@ -1882,7 +1909,7 @@ function Donut({
                 cy="70"
                 r="55"
                 fill="none"
-                stroke={c.color}
+                stroke={categoryInk(c.color)}
                 strokeWidth="16"
                 strokeDasharray={`${Math.max(0, ratio * 345.575 - 3)} ${345.575}`}
                 strokeDashoffset={-start * 345.575}
