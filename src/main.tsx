@@ -306,6 +306,10 @@ function App({
     .filter((i) => i.kind === "subscription")
     .reduce((n, i) => n + dailyCost(i, now), 0);
   const assetDaily = totalDaily - subDaily;
+  const monthDays = daysBetween(
+    now.slice(0, 7) + "-01",
+    addMonths(now.slice(0, 7) + "-01", 1),
+  );
   const upcoming = dueItems(ledger.items);
   const overdue = upcoming.filter((i) => occurrence(i) < now);
   const next30 = calendarEvents(ledger.items, now, addDays(now, 29));
@@ -464,7 +468,11 @@ function App({
           aria-label="日有所值首页"
         >
           <span className="brand-mark">
-            <img className="brand-logo" src="./icons/riyousuozhi-192-v1.png" alt="" />
+            <img
+              className="brand-logo"
+              src="./icons/riyousuozhi-192-v1.png"
+              alt=""
+            />
           </span>
           <span>
             日有所值<small>DAILY COST</small>
@@ -750,20 +758,21 @@ function App({
                   </div>
                   <div className="metric-value">
                     <span>¥</span>
-                    {money(
-                      totalDaily *
-                        daysBetween(
-                          now.slice(0, 7) + "-01",
-                          addMonths(now.slice(0, 7) + "-01", 1),
-                        ),
-                    )}
+                    {money(totalDaily * monthDays)}
+                  </div>
+                  <div className="monthly-breakdown">
+                    <span>
+                      订阅 <b>¥{money(subDaily * monthDays)}</b>
+                    </span>
+                    <span>
+                      资产均摊 <b>¥{money(assetDaily * monthDays)}</b>
+                    </span>
                   </div>
                   <p>按当前日均 × 本月天数估算</p>
                   <div className="metric-foot">
                     <span className="subtle-tag">
                       {Number(now.slice(5, 7))} 月
                     </span>
-                    <span>含订阅与资产均摊</span>
                   </div>
                 </section>
                 <section className="metric-card">
@@ -1505,6 +1514,9 @@ function App({
           key={editor.id}
           item={editor}
           categories={ledger.categories}
+          channels={[
+            ...new Set([...CHANNELS, ...ledger.items.map((i) => i.channel)]),
+          ]}
           isNew={!ledger.items.some((i) => i.id === editor.id)}
           onClose={() => setEditor(null)}
           onSave={async (item) => {
@@ -2021,12 +2033,14 @@ function Modal({
 function ItemEditor({
   item,
   categories,
+  channels,
   isNew,
   onClose,
   onSave,
 }: {
   item: Item;
   categories: Category[];
+  channels: string[];
   isNew: boolean;
   onClose: () => void;
   onSave: (item: Item) => void;
@@ -2040,6 +2054,10 @@ function ItemEditor({
     cycle: 0,
   });
   const [error, setError] = useState("");
+  const [customChannel, setCustomChannel] = useState(false);
+  const channelOptions = [...new Set([...channels, item.channel])].filter(
+    Boolean,
+  );
   const update = <K extends keyof Item>(key: K, value: Item[K]) =>
     setDraft((prev) => ({ ...prev, [key]: value }));
   return (
@@ -2047,6 +2065,10 @@ function ItemEditor({
       <form
         onSubmit={(e) => {
           e.preventDefault();
+          if (customChannel && !draft.channel.trim()) {
+            setError("请输入新的支付渠道");
+            return;
+          }
           const keepAnchor =
             !isNew &&
             draft.kind === "subscription" &&
@@ -2140,21 +2162,39 @@ function ItemEditor({
               ))}
             </select>
           </label>
-          <label>
-            支付渠道
-            <input
-              list="payment-channels"
-              maxLength={60}
-              value={draft.channel}
-              onChange={(e) => update("channel", e.target.value)}
-              placeholder="选择或输入渠道"
-            />
-            <datalist id="payment-channels">
-              {CHANNELS.map((c) => (
-                <option key={c} value={c} />
-              ))}
-            </datalist>
-          </label>
+          <div>
+            <label>
+              支付渠道
+              <select
+                aria-label="支付渠道"
+                value={customChannel ? "" : draft.channel}
+                onChange={(e) => {
+                  setCustomChannel(e.target.value === "");
+                  update("channel", e.target.value);
+                }}
+              >
+                {channelOptions.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+                <option value="">＋ 新增支付渠道</option>
+              </select>
+            </label>
+            {customChannel && (
+              <label>
+                新支付渠道名称
+                <input
+                  required
+                  maxLength={60}
+                  value={draft.channel}
+                  onChange={(e) => update("channel", e.target.value)}
+                  placeholder="例如：PayPal、公司账户"
+                />
+                <small>保存项目后，可在其他项目中选择此渠道。</small>
+              </label>
+            )}
+          </div>
           <label>
             {draft.kind === "asset" ? "购买金额" : "每期金额"}（元）
             <span>*</span>

@@ -488,6 +488,24 @@ h1 {
   font-size: 10px;
   line-height: 1.7;
 }
+.monthly-breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin-top: 10px;
+  color: #81718c;
+  font-size: 11px;
+  line-height: 1.7;
+}
+.monthly-breakdown > span {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 6px;
+}
+.monthly-breakdown b {
+  color: #3e334b;
+  font-weight: 650;
+}
 .metric-foot {
   color: #81718c;
   font-size: 10px;
@@ -787,6 +805,9 @@ h1 {
 .project-cost small {
   color: #81718c;
   font-size: 10px;
+}
+.list-layout .project-cost {
+  white-space: nowrap;
 }
 .project-meta,
 .project-meta > span:first-child {
@@ -1773,6 +1794,24 @@ footer {
     animation: none !important;
     transition: none !important;
     scroll-behavior: auto !important;
+  }
+}
+
+@media (max-width: 1000px) {
+  .list-layout .project-main {
+    grid-template-columns: minmax(0, 1.4fr) max-content minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 420px) {
+  .list-layout .project-main {
+    grid-template-columns: minmax(0, 1fr) max-content;
+  }
+  .list-layout .project-bottom {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
   }
 }
 

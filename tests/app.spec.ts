@@ -1,5 +1,35 @@
 import { test, expect } from "@playwright/test";
 
+test("payment channels offer fixed choices and reuse saved custom channels", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: "添加第一个项目", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog");
+  const channel = dialog.getByLabel("支付渠道", { exact: true });
+  for (const name of ["信用卡", "微信", "支付宝", "Apple Store"]) {
+    await channel.selectOption({ label: name });
+    await expect(channel).toHaveValue(name);
+  }
+  await channel.selectOption("");
+  await dialog.getByLabel("新支付渠道名称").fill("  PayPal  ");
+  await dialog.getByLabel("项目名称").fill("自定义渠道项目");
+  await dialog.getByLabel("每期金额").fill("20");
+  await dialog.getByRole("button", { name: "保存项目" }).click();
+  await page.reload();
+  await page.locator(".project-main").click();
+  await expect(dialog.locator(".detail-grid")).toContainText("PayPal");
+  await dialog.getByRole("button", { name: "编辑", exact: true }).click();
+  await expect(channel).toHaveValue("PayPal");
+  await dialog.getByRole("button", { name: "关闭弹窗" }).click();
+  await dialog.getByRole("button", { name: "关闭弹窗" }).click();
+  await page.getByRole("button", { name: "添加项目", exact: true }).click();
+  await channel.selectOption("PayPal");
+  await expect(channel).toHaveValue("PayPal");
+});
+
 test("personal ledger: add, persist, edit, pause/resume, record payment, category and delete", async ({
   page,
 }) => {

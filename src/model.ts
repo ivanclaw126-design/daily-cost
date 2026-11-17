@@ -39,10 +39,10 @@ export interface Ledger {
 }
 export const STORAGE_KEY = "riyou-shu:ledger:v1";
 export const CHANNELS = [
-  "支付宝",
-  "微信支付",
-  "Apple Store",
   "信用卡",
+  "微信",
+  "支付宝",
+  "Apple Store",
   "银行卡",
   "现金",
   "其他",
