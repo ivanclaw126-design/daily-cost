@@ -2,6 +2,8 @@
 
 一个轻盈的个人支出管理 Web App，把软件会员、订阅、电子设备、汽车与保险，换算成每天看得见的成本。纯静态网页，使用 GitHub Pages 部署，无需登录或后端。
 
+在线使用：[youshu.ootoday.top](https://youshu.ootoday.top/)。
+
 ## 使用
 
 - **总览**：每日固定成本、订阅与资产均摊、本月估算、未来 30 天待付、分类占比。
@@ -59,6 +61,8 @@ npm run test:e2e   # 浏览器增删改、暂停恢复、付款、分类、导�
 ## GitHub Pages 部署
 
 仓库公开，Pages 使用 `main` 分支下的 `/docs` 目录，`docs/.nojekyll` 禁用 Jekyll。Vite 使用相对资源路径，可直接部署到项目子路径。
+
+自定义域名为 `youshu.ootoday.top`。阿里云 DNS 的 `youshu` CNAME 指向 `ivanclaw126-design.github.io`；`public/CNAME` 在每次构建时复制到 `docs/CNAME`，保留域名配置。账本按浏览器来源隔离，如果旧 GitHub Pages 地址中已有记录，请从原页面导出备份，再在新域名导入。
 
 更新网页后执行 `npm run build`，提交源文件与 `docs/` 并推送 `main`。GitHub Pages 会自动发布新的静态文件。不要只提交源文件而漏掉 `docs/`。
 
